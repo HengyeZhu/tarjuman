@@ -40,7 +40,7 @@ example scripts.
 ```bash
 tarjuman info    model.nml                    # what is in this file?
 tarjuman convert model.nml --script run.py    # convert, report, emit a script
-tarjuman run     LEMS_Sim.xml --output v.dat  # convert and simulate
+tarjuman run     tests/data/LEMS_hh_single_comp.xml --output v.dat
 ```
 
 `tarjuman run` on a LEMS file reproduces the experiment the file describes —
@@ -88,7 +88,7 @@ net = model.module
 model.view("pop0", cell=2, segment=7, fraction_along=0.3).record("v")
 
 # Reproduce a LEMS simulation.
-result, model = tarjuman.run_lems("LEMS_Sim.xml")
+result, model = tarjuman.run_lems("tests/data/LEMS_hh_single_comp.xml")
 result.to_dataframe().head()
 ```
 
@@ -215,8 +215,12 @@ which is what a NeuroML user needs to know.
 
 ```bash
 pip install "tarjuman[validate]"      # pyneuroml + neuron
-tarjuman validate LEMS_Sim.xml
+tarjuman validate tests/data/LEMS_hh_single_comp.xml
 ```
+
+Every path in this README is a real file, either bundled with tarjuman or in a
+checkout of [NeuroML2](https://github.com/NeuroML/NeuroML2) or
+[c302](https://github.com/openworm/c302) beside it.
 
 The reference simulator needs a Java runtime. `pip install pyneuroml` gives you
 the `jnml` script but not Java itself, and macOS ships a `java` stub that only

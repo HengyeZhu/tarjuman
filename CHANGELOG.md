@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.2 — unreleased
+
+- Every path in the README and the examples is now a real file, either bundled
+  with tarjuman or in a NeuroML2 / c302 checkout beside it. The old
+  `LEMS_Sim.xml` was a placeholder that looked like something to paste.
+- A missing LEMS file is reported once, as a missing file, instead of being
+  rediscovered by each reference engine and reported twice.
+
 ## 0.4.1 — unreleased
 
 - `reference_available()` now checks that `jnml` actually runs, not merely that

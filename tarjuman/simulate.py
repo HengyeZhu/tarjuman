@@ -177,7 +177,7 @@ def run_lems(
 ) -> tuple[SimulationResult, ConvertedModel]:
     """Run a LEMS simulation file through Jaxley.
 
-    This is the tarjuman equivalent of ``pynml LEMS_Sim.xml -jnml``: it reads
+    This is the tarjuman equivalent of ``pynml <LEMS file> -jnml``: it reads
     the model, converts it, applies the inputs, records the quantities the
     ``OutputFile`` elements ask for, and integrates for the requested duration.
 

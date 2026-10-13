@@ -2,7 +2,7 @@
 
 A NeuroML model on its own says what exists; the LEMS file says what to run:
 the duration, the time step, the target network, and which quantities to
-record.  ``tarjuman`` reads that file so that ``tarjuman run LEMS_Sim.xml``
+record.  ``tarjuman`` reads that file so that ``tarjuman run <LEMS file>``
 reproduces the same experiment that ``jnml`` or ``pyneuroml`` would run.
 
 ``<Include file=...>`` elements pointing at NeuroML documents are followed;

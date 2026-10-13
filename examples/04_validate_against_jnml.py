@@ -1,7 +1,7 @@
 """Check a converted model against the reference NeuroML simulator.
 
     pip install pyneuroml          # needs a Java runtime
-    python examples/04_validate_against_jnml.py path/to/LEMS_Sim.xml
+    python examples/04_validate_against_jnml.py NeuroML2/LEMSexamples/LEMS_NML2_Ex5_DetCell.xml
 
 Agreement with analytic references says the equations were implemented
 correctly. Agreement with ``jnml`` says the *model* was translated correctly,

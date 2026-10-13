@@ -739,6 +739,15 @@ def validate_lems(
         model=lems_path.name, tolerances={**DEFAULT_TOLERANCES, **(tolerances or {})}
     )
 
+    if not lems_path.exists():
+        # Report a missing file once, as itself, rather than letting every
+        # engine rediscover it and reporting the same thing twice.
+        result.error = (
+            f"no such file: {lems_path}. Give the path to a LEMS file, "
+            "e.g. tests/data/LEMS_hh_single_comp.xml"
+        )
+        return result
+
     engines = ["jlems", "neuron"] if engine == "auto" else [engine]
     failures = []
     for candidate_engine in engines:

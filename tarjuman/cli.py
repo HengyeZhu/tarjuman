@@ -10,7 +10,7 @@ Three commands:
     Build the Jaxley model, print the conversion report, and optionally write a
     runnable Python script that rebuilds it.
 
-``tarjuman run LEMS_Sim.xml``
+``tarjuman run LEMS_NML2_Ex5_DetCell.xml``
     Convert and simulate, writing the traces the LEMS file asks for.
 """
 

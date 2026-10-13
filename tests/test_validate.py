@@ -394,3 +394,11 @@ def test_no_reference_problem_is_reported_when_it_works(monkeypatch):
     assert module.reference_available() is True
     assert module.reference_problem() is None
     module.reference_available.cache_clear()
+
+
+def test_a_missing_file_is_reported_once(tmp_path):
+    """Not once per reference engine, and not as a stack trace."""
+    result = validate_lems(tmp_path / "LEMS_NotHere.xml")
+    assert not result.passed
+    assert result.error.startswith("no such file")
+    assert "jlems" not in result.error and "neuron" not in result.error
