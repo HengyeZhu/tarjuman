@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.1 — unreleased
+
+- `reference_available()` now checks that `jnml` actually runs, not merely that
+  the script is on the PATH. `pip install pyneuroml` installs that script with
+  or without a Java runtime, and macOS ships a `java` stub whose only purpose
+  is to report that Java is missing — so a machine without a JDK got two
+  confusing test failures where it should have got two skips. A new
+  `reference_problem()` says what is wrong and how to fix it, and
+  `tarjuman validate` prints it.
+
 ## 0.4.0 — unreleased
 
 Validation against the reference NeuroML simulator, answering the question the

@@ -214,9 +214,21 @@ correctly. Agreement with `jnml` says the **model was translated correctly**,
 which is what a NeuroML user needs to know.
 
 ```bash
-pip install "tarjuman[validate]"      # pyneuroml + neuron; needs Java
+pip install "tarjuman[validate]"      # pyneuroml + neuron
 tarjuman validate LEMS_Sim.xml
 ```
+
+The reference simulator needs a Java runtime. `pip install pyneuroml` gives you
+the `jnml` script but not Java itself, and macOS ships a `java` stub that only
+reports Java as missing, so install a real JDK:
+
+```bash
+brew install --cask temurin     # macOS
+java -version                   # should print a version, not an error
+```
+
+The tests that use the reference simulator skip when it is unavailable, and
+`tarjuman validate` says what is missing.
 
 ```
 PASS  LEMS_NML2_Ex5_DetCell.xml

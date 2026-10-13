@@ -349,3 +349,48 @@ def test_iaf_tau_cell_reports_its_missing_current_term():
         report,
     )
     assert any("no current term" in note.message for note in report.approximations)
+
+
+def test_availability_requires_a_runnable_reference(monkeypatch):
+    """The script existing is not the same as the simulator working.
+
+    `pip install pyneuroml` puts `jnml` on the PATH with or without a Java
+    runtime, and macOS ships a `java` stub whose only job is to report that
+    Java is missing. Treating the script's presence as readiness turned a
+    missing JDK into confusing test failures instead of skips.
+    """
+    import subprocess
+
+    from tarjuman import validate as module
+
+    module.reference_available.cache_clear()
+    monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/local/bin/jnml")
+
+    def failing_run(*args, **kwargs):
+        return subprocess.CompletedProcess(
+            args, returncode=1, stdout="", stderr="Unable to locate a Java Runtime."
+        )
+
+    monkeypatch.setattr(module.subprocess, "run", failing_run)
+    assert module.reference_available() is False
+
+    problem = module.reference_problem()
+    assert problem is not None and "java" in problem.lower()
+    module.reference_available.cache_clear()
+
+
+def test_no_reference_problem_is_reported_when_it_works(monkeypatch):
+    import subprocess
+
+    from tarjuman import validate as module
+
+    module.reference_available.cache_clear()
+    monkeypatch.setattr(module.shutil, "which", lambda name: "/usr/local/bin/jnml")
+    monkeypatch.setattr(
+        module.subprocess,
+        "run",
+        lambda *a, **k: subprocess.CompletedProcess(a, 0, "jNeuroML v0.12.0", ""),
+    )
+    assert module.reference_available() is True
+    assert module.reference_problem() is None
+    module.reference_available.cache_clear()

@@ -34,6 +34,7 @@ import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -48,6 +49,7 @@ __all__ = [
     "TraceComparison",
     "ValidationResult",
     "reference_available",
+    "reference_problem",
     "run_reference",
     "compare_traces",
     "auto_threshold",
@@ -217,9 +219,48 @@ def reset_times(time: np.ndarray, voltage: np.ndarray) -> np.ndarray:
 # --------------------------------------------------------------------------- #
 # Running the reference simulator
 # --------------------------------------------------------------------------- #
+@lru_cache(maxsize=1)
 def reference_available() -> bool:
-    """True if ``jnml`` is on the PATH."""
-    return shutil.which("jnml") is not None
+    """True if the reference simulator is installed **and can run**.
+
+    Checking the PATH is not enough. ``pip install pyneuroml`` puts a ``jnml``
+    script there whether or not a Java runtime exists, and on macOS the
+    system's own ``java`` is a stub whose only purpose is to report that Java
+    is missing. Taking the script's presence as readiness turns "Java is not
+    installed" into two confusing test failures instead of two skips, so this
+    actually invokes ``jnml``.
+    """
+    if shutil.which("jnml") is None:
+        return False
+    try:
+        process = subprocess.run(
+            ["jnml", "-v"], capture_output=True, text=True, timeout=120
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return process.returncode == 0
+
+
+def reference_problem() -> Optional[str]:
+    """Why the reference simulator is unusable, or ``None`` if it is fine."""
+    if shutil.which("jnml") is None:
+        return (
+            "jnml was not found on the PATH. Install it with "
+            "`pip install pyneuroml`."
+        )
+    if reference_available():
+        return None
+    if shutil.which("java") is None:
+        return (
+            "jnml is installed but there is no Java runtime. Install one with "
+            "`brew install --cask temurin` on macOS, or your platform's JDK "
+            "package."
+        )
+    return (
+        "jnml is installed but will not run. On macOS the system `java` is a "
+        "stub that only reports Java as missing; install a real JDK with "
+        "`brew install --cask temurin`. Check with `java -version`."
+    )
 
 
 #: Reference engines, as the full ``jnml`` argument list for each. ``-nogui``
@@ -264,10 +305,7 @@ def run_reference(
         ReferenceUnavailable: If ``jnml`` is missing or exits non-zero.
     """
     if not reference_available():
-        raise ReferenceUnavailable(
-            "jnml was not found on the PATH. Install it with "
-            "`pip install pyneuroml` (it needs a Java runtime)."
-        )
+        raise ReferenceUnavailable(reference_problem())
 
     lems_path = Path(lems_path).resolve()
     _, simulation = read_lems(lems_path)

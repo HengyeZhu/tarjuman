@@ -45,6 +45,7 @@ from .validate import (
     ValidationResult,
     convergence_study,
     reference_available,
+    reference_problem,
     validate_lems,
 )
 
@@ -73,6 +74,7 @@ __all__ = [
     "validate_lems",
     "convergence_study",
     "reference_available",
+    "reference_problem",
     "ValidationResult",
     "TraceComparison",
     "NeuroMLChannel",

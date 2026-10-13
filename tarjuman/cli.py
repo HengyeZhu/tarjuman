@@ -200,14 +200,10 @@ plt.show()
 
 
 def _cmd_validate(args) -> int:
-    from .validate import ReferenceUnavailable, reference_available, validate_lems
+    from .validate import reference_available, reference_problem, validate_lems
 
     if not reference_available():
-        print(
-            "tarjuman: jnml was not found on the PATH. Install the reference "
-            "simulator with `pip install pyneuroml` (it needs Java).",
-            file=sys.stderr,
-        )
+        print(f"tarjuman: {reference_problem()}", file=sys.stderr)
         return 2
 
     tolerances = {}
