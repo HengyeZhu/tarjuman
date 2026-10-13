@@ -40,6 +40,13 @@ from .reader import read_lems, read_neuroml, read_neuroml_string
 from .report import ConversionReport
 from .simulate import SimulationResult, from_neuroml, run_lems, simulate
 from .synapses import make_synapse
+from .validate import (
+    TraceComparison,
+    ValidationResult,
+    convergence_study,
+    reference_available,
+    validate_lems,
+)
 
 __all__ = [
     "__version__",
@@ -62,6 +69,12 @@ __all__ = [
     "CellMorphology",
     "make_channel",
     "make_synapse",
+    # validation against a reference simulator
+    "validate_lems",
+    "convergence_study",
+    "reference_available",
+    "ValidationResult",
+    "TraceComparison",
     "NeuroMLChannel",
     # errors
     "TarjumanError",

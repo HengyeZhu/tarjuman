@@ -23,7 +23,8 @@ from ..errors import ParseError
 from ..lems.builtins import builtin_registry
 from ..lems.component_types import base_kind_of, read_component_type, resolve_inheritance
 from ..report import ConversionReport
-from ..units import to_jaxley
+from ..units import convert, parse_quantity, to_jaxley
+from ..errors import UnitError
 
 __all__ = ["read_neuroml", "read_neuroml_string"]
 
@@ -562,14 +563,33 @@ _SYNAPSE_PARAM_DIMENSIONS = {
 
 
 def _read_params(element: ET.Element, context: str) -> dict[str, float]:
+    """Read a component's numeric attributes into Jaxley units.
+
+    The dimension comes from the unit symbol the model actually wrote, not from
+    the attribute's name: NeuroML reuses short names across component types
+    with different dimensions (``k`` is a rate in ``gradedSynapse`` and a
+    conductance slope in ``gradedSynapse2``), so a name-to-dimension table is
+    wrong as often as it is right. The table is kept only for attributes given
+    as bare numbers, where there is no unit to read.
+    """
     params: dict[str, float] = {}
     for name, value in element.attrib.items():
         if name in ("id", "type", "species", "neuroLexId"):
             continue
-        dimension = _SYNAPSE_PARAM_DIMENSIONS.get(name)
-        if dimension is None:
+        expected = _SYNAPSE_PARAM_DIMENSIONS.get(name)
+        try:
+            si_value, dimension = parse_quantity(value, None, context)
+        except UnitError:
+            continue  # not a quantity (a label, a path, ...)
+        if dimension == "none" and expected is not None:
+            # A bare number: fall back on what the name usually means.
+            dimension = expected
+        if expected is None and dimension == "none":
+            continue  # an unrecognised dimensionless attribute
+        try:
+            params[name] = convert(si_value, dimension)
+        except UnitError:
             continue
-        params[name] = to_jaxley(value, dimension, context)
     return params
 
 

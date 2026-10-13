@@ -151,6 +151,7 @@ back on the way out, using the dimensions the `ComponentType` declares.
 | `gapJunction`, `linearGradedSynapse`, `gradedSynapse`, `silentSynapse` | ✅ |
 | synapses defined as custom ComponentTypes (`gradedSynapse2`, …) | ✅ |
 | `iafCell`, `iafRefCell`, `iafTauCell`, `iafTauRefCell` | ⚠️ reset approximated, see below |
+| Validation against `jnml` / NEURON (`tarjuman validate`) | ✅ |
 | `population`, `populationList`, `projection`, `electricalProjection`, `continuousProjection`, weights | ✅ |
 | `pulseGenerator`, `rampGenerator`, `sineGenerator`, `inputList`, `explicitInput` | ✅ |
 | LEMS `Simulation`, `OutputFile`, `Display` | ✅ |
@@ -191,6 +192,13 @@ cell type cannot be interpreted as written. This is what blocks c302 parameter
 set B. Parsing does not fail — only instantiating that component does, with an
 explanation.
 
+**`iafTauCell` has no current term.** It extends `baseIaf`, not
+`baseIafCapCell`, so in NeuroML an injected current does nothing to it at all;
+a Jaxley compartment cannot ignore its own input current. The free decay to
+`leakReversal` with the stated time constant is exact, but current injected
+into such a cell moves it when in NeuroML it would not. The conversion report
+says so.
+
 **Synaptic delays** are quantised to whole integration steps. A NeuroML
 connection `delay` becomes a shift register over the presynaptic voltage
 (`DelayedSynapse`), which costs `delay / delta_t` extra states per synapse — a
@@ -199,9 +207,90 @@ is fixed when the model is built, the step must be known then: `run_lems()`
 takes it from the LEMS file, `from_neuroml()` accepts `delta_t=`. Without it
 the delay is dropped and the report says so.
 
+## Validation against the reference simulator
+
+Agreement with analytic references says the equations were implemented
+correctly. Agreement with `jnml` says the **model was translated correctly**,
+which is what a NeuroML user needs to know.
+
+```bash
+pip install "tarjuman[validate]"      # pyneuroml + neuron; needs Java
+tarjuman validate LEMS_Sim.xml
+```
+
+```
+PASS  LEMS_NML2_Ex5_DetCell.xml
+  ok   v: spikes 7 vs 7, sub-threshold RMS 0.382 mV, spike shift -0.415 ms (drift -0.1139 ms/ISI)
+  ok   m: max |diff| 0.739, RMS 0.08445, r=0.89930
+  jlems 2.2s, tarjuman 1.7s (1.3x)
+```
+
+Measured on the NeuroML example suite:
+
+| model | reference | result |
+|---|---|---|
+| `Ex5_DetCell` — HH cell, voltage and three gates | jLEMS | spikes 7 vs 7, sub-threshold RMS **0.38 mV** |
+| `Ex25_MultiComp` — 3 cells, 12 compartments, AMPA + NMDA | NEURON | all 12 traces, spike counts equal, RMS **0.05–0.48 mV** |
+| `Ex19_GapJunctions` — electrical coupling | jLEMS | spikes 3 vs 3, RMS **0.02 mV** |
+| `Ex20_AnalogSynapses` — graded transmission | jLEMS | spike counts equal |
+| `Ex10_Q10` — temperature-scaled gates | jLEMS | spikes 3 vs 3, RMS **0.93 mV** |
+
+Across the whole suite: of the 31 models, 15 use NeuroML features tarjuman
+cannot yet convert and one jLEMS cannot run. **Of the 14 that both simulators
+can run, 9 match the reference.** The five that do not are each explained by a
+limitation this README already lists — spike sources, short-term plasticity,
+and the `iafTauCell` current term — and `tarjuman validate` prints which.
+
+### Why the comparison is spike-aware
+
+Two simulators that agree perfectly still drift apart in spike *timing*,
+because they discretise differently. At the rising edge of an action potential
+a sub-millisecond shift shows up as a 70 mV difference, so a point-wise RMS
+over a spiking trace measures timing jitter rather than correctness. The
+comparison therefore separates:
+
+- **spike count** — exact by default, and the check that fails loudest when a
+  channel is wrong;
+- **spike timing** — a mean shift and a drift per inter-spike interval, which
+  distinguishes a harmless constant offset from a frequency difference;
+- **sub-threshold RMS** — the voltage away from spikes, where a point-wise
+  comparison does mean something.
+
+Spike thresholds come from the model's own `spikeThresh` rather than being
+inferred from the trace, and the detection mode is chosen once from the
+reference and applied to both traces. Both matter: a compartment receiving only
+sub-threshold EPSPs has no spikes, but a trace-derived threshold will sit among
+the EPSP peaks and count them; and a cell clamped exactly at its threshold may
+register crossings in one simulator and none in the other.
+
+### Is a difference numerical or real?
+
+`tarjuman converge` runs both simulators at a sequence of time steps. jLEMS
+integrates explicitly and Jaxley implicitly, so the two approach the exact
+solution from opposite sides:
+
+| `dt` (ms) | jLEMS mean ISI | tarjuman |
+|---|---|---|
+| 0.01 | 16.163 | 16.049 |
+| 0.001 | 16.036 | 16.024 |
+| 0.0005 | **16.029** | **16.024** |
+
+The 0.7% discrepancy at `dt = 0.01` is entirely jLEMS's discretisation error.
+In the converged limit the two agree to **0.03%** — and at any given step
+tarjuman is the closer of the two to the converged answer, because Jaxley
+solves implicitly with exponential-Euler gates.
+
+### What the reference cannot do
+
+**jLEMS cannot simulate multicompartmental cells at all** — it refuses them
+with "Level of support: NONE". For those models `engine="auto"` falls back to
+exporting the model to NEURON and running that, which is how the `Ex25` row
+above was measured.
+
 ## Correctness
 
-The package is checked against things that do not depend on it:
+The package is also checked against things that do not depend on either
+simulator:
 
 - **Hodgkin-Huxley equivalence.** `NML2_SingleCompHHCell.nml` uses the textbook
   HH equations, which `jaxley.channels.HH` implements independently. Converted

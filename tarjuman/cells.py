@@ -183,9 +183,24 @@ def build_point_cell(
         tau = parameters.get("tau")
         if tau is None:
             raise UnsupportedComponentError(f"{context} has no 'tau'.")
+        # NeuroML's iafTauCell extends baseIaf, not baseIafCapCell: it has no
+        # capacitance and no current term, so `dv/dt = (leakReversal - v)/tau`
+        # and an injected current does nothing to it at all. Jaxley has no way
+        # to express a compartment that ignores its own input current, so the
+        # cell is given a capacitance and the conductance that reproduces tau.
+        # The free dynamics are then exact; the response to injected current is
+        # not, because NeuroML specifies none.
         capacitance_pf = 10.0
         # pF / ms == nS; Jaxley conductances are in uS.
         leak_conductance_us = capacitance_pf / tau * 1e-3
+        report.approximation(
+            context,
+            "NeuroML's iafTauCell family has no current term - injected "
+            "current has no effect on it - but a Jaxley compartment cannot "
+            "ignore its input current. The free decay to leakReversal with "
+            f"time constant {tau:g} ms is exact; any current injected into "
+            "this cell will move it when in NeuroML it would not",
+        )
         e_leak = parameters.get("leakReversal", parameters.get("reset", -65.0))
     if capacitance_pf is None or leak_conductance_us is None:
         raise UnsupportedComponentError(

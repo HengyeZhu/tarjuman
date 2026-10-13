@@ -93,6 +93,8 @@ def read_lems(
     for output_file in simulation_element:
         if _tag(output_file) == "OutputFile":
             file_id = output_file.get("id", "out")
+            if output_file.get("fileName"):
+                simulation.output_files[file_id] = output_file.get("fileName")
             for column in output_file:
                 if _tag(column) != "OutputColumn":
                     continue

@@ -434,5 +434,8 @@ class SimulationSpec:
     #: kept because column ids are only unique within a file: c302 names both
     #: the voltage column and the calcium column of a cell ``AVBL_v``.
     outputs: list[tuple[str, str, str]] = field(default_factory=list)
+    #: ``OutputFile`` id -> the path it writes, as the LEMS file gives it.
+    #: Needed to line a reference simulator's output up with these columns.
+    output_files: dict[str, str] = field(default_factory=dict)
     #: (event id, LEMS quantity path, threshold) from ``EventOutputFile``.
     event_outputs: list[tuple[str, str, float]] = field(default_factory=list)

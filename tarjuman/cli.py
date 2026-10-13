@@ -199,6 +199,67 @@ plt.show()
 '''
 
 
+def _cmd_validate(args) -> int:
+    from .validate import ReferenceUnavailable, reference_available, validate_lems
+
+    if not reference_available():
+        print(
+            "tarjuman: jnml was not found on the PATH. Install the reference "
+            "simulator with `pip install pyneuroml` (it needs Java).",
+            file=sys.stderr,
+        )
+        return 2
+
+    tolerances = {}
+    if args.rms is not None:
+        tolerances["subthreshold_rms_mv"] = args.rms
+    if args.spike_shift is not None:
+        tolerances["spike_time_shift_ms"] = args.spike_shift
+
+    models = sorted(args.model) if len(args.model) > 1 else args.model
+    failures = 0
+    for model in models:
+        result = validate_lems(
+            model,
+            tolerances=tolerances or None,
+            delta_t=args.dt,
+            timeout=args.timeout,
+            engine=args.engine,
+        )
+        print(result.summary())
+        failures += 0 if result.passed else 1
+
+    if len(models) > 1:
+        print(f"\n{len(models) - failures}/{len(models)} models passed")
+    return 1 if failures else 0
+
+
+def _cmd_converge(args) -> int:
+    from .validate import convergence_study
+
+    study = convergence_study(
+        args.model, steps=args.steps, timeout=args.timeout
+    )
+    print(f"convergence of mean inter-spike interval: {Path(args.model).name}")
+    print(f"{'dt (ms)':>10}  {'reference':>12}  {'tarjuman':>12}  {'diff':>10}")
+    for step, reference, candidate in zip(
+        study["steps"], study["reference_isi"], study["tarjuman_isi"]
+    ):
+        if reference is None or candidate is None:
+            print(f"{step:>10}  {'-':>12}  {'-':>12}  {'-':>10}")
+            continue
+        print(
+            f"{step:>10}  {reference:>12.5f}  {candidate:>12.5f}  "
+            f"{candidate - reference:>+10.5f}"
+        )
+    print(
+        "\nA difference that shrinks as dt falls is discretisation, not "
+        "disagreement:\nthe reference integrates explicitly and Jaxley "
+        "implicitly, so they approach\nthe exact solution from opposite sides."
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="tarjuman",
@@ -231,6 +292,45 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--plot", default=None, metavar="FILE.png", help="write a plot")
     _add_common(run)
     run.set_defaults(func=_cmd_run)
+
+    validate = subparsers.add_parser(
+        "validate",
+        help="compare against a reference NeuroML simulator (needs jnml)",
+    )
+    validate.add_argument("model", type=Path, nargs="+", help="LEMS_*.xml file(s)")
+    validate.add_argument(
+        "--engine",
+        default="auto",
+        choices=["auto", "jlems", "neuron"],
+        help="reference simulator; 'auto' falls back to NEURON for "
+        "multicompartmental models, which jLEMS cannot run",
+    )
+    validate.add_argument("--dt", type=float, default=None, help="time step in ms")
+    validate.add_argument(
+        "--rms", type=float, default=None, help="sub-threshold RMS tolerance in mV"
+    )
+    validate.add_argument(
+        "--spike-shift", type=float, default=None, help="spike shift tolerance in ms"
+    )
+    validate.add_argument(
+        "--timeout", type=int, default=900, help="seconds allowed per reference run"
+    )
+    validate.set_defaults(func=_cmd_validate)
+
+    converge = subparsers.add_parser(
+        "converge",
+        help="show how both simulators converge as the time step falls",
+    )
+    converge.add_argument("model", type=Path)
+    converge.add_argument(
+        "--steps",
+        type=float,
+        nargs="+",
+        default=[0.01, 0.005, 0.001],
+        help="time steps in ms, largest first",
+    )
+    converge.add_argument("--timeout", type=int, default=900)
+    converge.set_defaults(func=_cmd_converge)
 
     args = parser.parse_args(argv)
     try:

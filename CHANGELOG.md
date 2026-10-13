@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.4.0 — unreleased
+
+Validation against the reference NeuroML simulator, answering the question the
+test suite could not: agreement with analytic references says the equations
+were implemented correctly, agreement with `jnml` says the *model* was
+translated correctly.
+
+### `tarjuman validate`
+
+A new module, `tarjuman.validate`, runs both simulators on the same LEMS file
+and compares the traces; `tarjuman validate` and `tarjuman converge` expose it,
+and a GitHub Actions workflow runs it on every push.
+
+Comparison is spike-aware rather than point-wise. Two simulators that agree
+perfectly still drift in spike *timing* because they discretise differently,
+and at the rising edge of an action potential a sub-millisecond shift reads as
+a 70 mV error, so a plain RMS measures jitter rather than correctness. The
+comparison separates spike count, spike timing (as a mean shift and a drift per
+inter-spike interval) and the sub-threshold voltage.
+
+Two engines are supported. jLEMS is the most direct reading of the
+specification but **cannot simulate multicompartmental cells** — it refuses
+them outright — so `engine="auto"` falls back to NEURON for those.
+
+`convergence_study` settles whether a difference is numerical: jLEMS integrates
+explicitly and Jaxley implicitly, so they approach the exact solution from
+opposite sides, and a difference that shrinks as `dt` falls is discretisation
+rather than disagreement.
+
+### Fixed
+
+- A parameter's dimension now comes from the unit symbol the model wrote, not
+  from a table keyed on the attribute's name. NeuroML reuses short names across
+  component types with different dimensions — `k` is a rate in `gradedSynapse`
+  and a conductance slope in `gradedSynapse2` — so the old table rejected valid
+  models (`Unit 'nS_per_mV' has dimension 'conductance_per_voltage' but
+  'per_time' was expected`). The table is kept only for attributes written as
+  bare numbers, where there is no unit to read.
+- Spike thresholds for validation are taken from the model's own `spikeThresh`
+  (or a point cell's `thresh`) rather than inferred from the trace. A
+  compartment receiving only sub-threshold EPSPs has no spikes, but a
+  trace-derived threshold lands among the EPSP peaks and counts them.
+- A gate part supplied as a custom ComponentType is no longer treated as
+  missing. A `gateHHrates` whose `forwardRate` was model-defined was rejected
+  as "missing forwardRate", so the whole channel was dropped and the cell ran
+  without that current. Found by the reference comparison, which reported the
+  wrong spike count on `LEMS_NML2_Ex10_Q10`; no unit test could have seen it,
+  because the conversion reported the channel as unsupported and carried on.
+- `iafTauCell` and `iafTauRefCell` now report that NeuroML gives them no
+  current term at all: they extend `baseIaf`, not `baseIafCapCell`, so an
+  injected current does nothing to them in NeuroML, while a Jaxley compartment
+  cannot ignore its input. The free decay is exact; the response to injected
+  current is not, and the conversion report says so.
+
 ## 0.3.0 — unreleased
 
 Acts on the Jaxley developers' answers in

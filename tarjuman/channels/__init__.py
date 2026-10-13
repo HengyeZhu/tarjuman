@@ -311,13 +311,25 @@ class NeuroMLChannel(Channel):
         return names
 
     def _validate_gate(self, spec: _GateSpec) -> None:
+        """Check a gate has the parts its type needs.
+
+        A part may be supplied either as one of NeuroML's standard forms or as
+        a custom ComponentType, so each check accepts both: a gate whose
+        ``forwardRate`` is a model-defined rate is complete, not missing.
+        """
+
+        def has(part: str, standard) -> bool:
+            return standard is not None or part in spec.part_dynamics
+
         needs_alpha_beta = spec.kind in (
             "gateHHrates",
             "gateHHratesTau",
             "gateHHratesInf",
             "gateHHratesTauInf",
         )
-        if needs_alpha_beta and (spec.alpha is None or spec.beta is None):
+        if needs_alpha_beta and not (
+            has("forward_rate", spec.alpha) and has("reverse_rate", spec.beta)
+        ):
             raise UnsupportedComponentError(
                 f"Gate '{spec.id}' of type {spec.kind} is missing forwardRate or "
                 "reverseRate."
@@ -328,12 +340,12 @@ class NeuroMLChannel(Channel):
             "gateHHratesTauInf",
             "gateHHInstantaneous",
         )
-        if needs_steady_state and spec.steady_state is None:
+        if needs_steady_state and not has("steady_state", spec.steady_state):
             raise UnsupportedComponentError(
                 f"Gate '{spec.id}' of type {spec.kind} is missing steadyState."
             )
         needs_tau = spec.kind in ("gateHHtauInf", "gateHHratesTau", "gateHHratesTauInf")
-        if needs_tau and spec.tau_param is None:
+        if needs_tau and not has("time_course", spec.tau_param):
             raise UnsupportedComponentError(
                 f"Gate '{spec.id}' of type {spec.kind} is missing timeCourse."
             )

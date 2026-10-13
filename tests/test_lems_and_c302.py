@@ -470,3 +470,67 @@ def test_unsupported_point_cell_says_why():
     point_cell = ir.PointCell(id="izh", kind="izhikevich2007Cell", params={})
     with pytest.raises(UnsupportedComponentError, match="izhikevich2007Cell"):
         build_point_cell(point_cell, ConversionReport())
+
+
+def test_a_custom_rate_satisfies_a_standard_gate():
+    """A gate part may be a model-defined ComponentType, not only a standard form.
+
+    Regression: a ``gateHHrates`` whose ``forwardRate`` was a custom
+    ComponentType was rejected as "missing forwardRate", so the whole channel
+    was dropped and the cell ran without its potassium current — which showed
+    up only as a wrong spike count against the reference simulator.
+    """
+    import xml.etree.ElementTree as ET
+
+    from tarjuman.channels import make_channel
+    from tarjuman.lems.builtins import builtin_registry
+    from tarjuman.lems.component_types import read_component_type, resolve_inheritance
+
+    custom = read_component_type(
+        ET.fromstring(
+            """
+            <ComponentType name="newExpRate" extends="baseVoltageDepRate">
+                <Parameter name="rate" dimension="per_time"/>
+                <Parameter name="midpoint" dimension="voltage"/>
+                <Parameter name="scale" dimension="voltage"/>
+                <Dynamics>
+                    <DerivedVariable name="r" exposure="r" dimension="per_time"
+                                     value="rate * exp((v - midpoint)/scale)"/>
+                </Dynamics>
+            </ComponentType>
+            """
+        )
+    )
+    registry = builtin_registry()
+    registry[custom.name] = custom
+    component_types = {custom.name: resolve_inheritance(custom, registry)}
+
+    gate = ir.Gate(
+        id="n",
+        instances=4,
+        kind="gateHHrates",
+        reverse_rate=ir.Rate("HHExpRate", 0.125, -65.0, -80.0),
+        custom_parts={
+            "forward_rate": ir.CustomComponent(
+                id="fwd",
+                component_type="newExpRate",
+                attributes={
+                    "rate": "0.1per_ms",
+                    "midpoint": "-55mV",
+                    "scale": "10mV",
+                },
+            )
+        },
+    )
+    channel_ir = ir.IonChannel(id="kChan", kind="ionChannelHH", gates=[gate])
+
+    # Must build rather than raise "missing forwardRate".
+    channel = make_channel(channel_ir, component_types=component_types)
+    assert "kChan_n" in channel.channel_states
+    # Custom parts are named after the gate part they fill.
+    assert float(
+        channel.channel_params["kChan_n_forward_rate_rate"]
+    ) == pytest.approx(0.1)
+    assert float(
+        channel.channel_params["kChan_n_forward_rate_midpoint"]
+    ) == pytest.approx(-55.0)
